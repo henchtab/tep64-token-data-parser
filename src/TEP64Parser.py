@@ -4,24 +4,48 @@ from pytoniq_core import Cell
 
 
 class ContentParsingError(Exception):
+    """Base exception class for content parsing errors."""
+
     pass
 
 
 class InvalidPrefixError(ContentParsingError):
+    """Exception raised for invalid prefix errors during parsing."""
+
     pass
 
 
 class DataFetchingError(ContentParsingError):
+    """Exception raised for errors during data fetching."""
+
     pass
 
 
 class TEP64Parser:
+    """
+    A parser for TEP-64 token data.
+
+    Attributes:
+        ipfs_endpoint (str): The base URL for fetching IPFS data.
+        prefix_handlers (dict): Custom handlers for specific prefix values.
+        extra_default_values (dict): Additional default values for onchain content.
+        default_handlers (dict): Default handlers for predefined prefixes.
+    """
+
     def __init__(
         self,
         ipfs_endpoint="https://ipfs.io/ipfs/",
         prefix_handlers=None,
         extra_default_values=None,
     ):
+        """
+        Initialize TEP64Parser with optional parameters.
+
+        Args:
+            ipfs_endpoint (str, optional): The base URL for IPFS data fetching. Defaults to "https://ipfs.io/ipfs/".
+            prefix_handlers (dict, optional): Custom handlers for specific prefix values. Defaults to None.
+            extra_default_values (dict, optional): Additional default values for onchain content. Defaults to None.
+        """
         self.ipfs_endpoint = ipfs_endpoint
         self.prefix_handlers = prefix_handlers or {}
         self.extra_default_values = extra_default_values or {}
@@ -31,6 +55,18 @@ class TEP64Parser:
         }
 
     def fetch_data(self, uri):
+        """
+        Fetch data from a given URI.
+
+        Args:
+            uri (str): The URI to fetch data from.
+
+        Returns:
+            str: The fetched data.
+
+        Raises:
+            DataFetchingError: If there's an error fetching the data.
+        """
         try:
             if uri.startswith("ipfs://"):
                 ipfs_uri = uri.replace("ipfs://", self.ipfs_endpoint)
@@ -44,10 +80,32 @@ class TEP64Parser:
 
     @staticmethod
     def parse_prefix(cs):
+        """
+        Parse the prefix value from a Cell.
+
+        Args:
+            cs (Cell): The Cell object containing the data to parse.
+
+        Returns:
+            int: The parsed prefix value as an integer.
+        """
         prefix = cs.load_bits(8)
         return int(prefix.to01())
 
     def default_handle_offchain_content(self, cs):
+        """
+        Handle offchain content parsing and data fetching.
+
+        Args:
+            cs (Cell): The Cell object containing the offchain content.
+
+        Returns:
+            dict: Parsed offchain content data.
+
+        Raises:
+            InvalidPrefixError: If the prefix value is invalid for offchain content.
+            DataFetchingError: If there's an error fetching the data.
+        """
         uri = None
 
         if cs.refs == 0:
@@ -65,14 +123,42 @@ class TEP64Parser:
 
     @staticmethod
     def load_metadata(cs):
+        """
+        Load metadata from a Cell.
+
+        Args:
+            cs (Cell): The Cell object containing the metadata.
+
+        Returns:
+            dict: Loaded metadata as a dictionary.
+        """
         return cs.load_dict(256)
 
     @staticmethod
     def calculate_key(key_string):
+        """
+        Calculate a key using SHA-256 from a given string.
+
+        Args:
+            key_string (str): The string to calculate the key from.
+
+        Returns:
+            int: The calculated key as an integer.
+        """
         key_bytes = sha256(key_string.encode("utf-8")).digest()
         return int.from_bytes(key_bytes, "big")
 
     def default_handle_onchain_content(self, cs):
+        """
+        Handle onchain content parsing and metadata loading.
+
+        Args:
+            cs (Cell): The Cell object containing the onchain content.
+
+        Returns:
+            dict: Parsed onchain content metadata.
+
+        """
         default_values = {
             "uri": None,
             "name": None,
@@ -100,10 +186,20 @@ class TEP64Parser:
         return {"type": "onchain", "metadata": all_metadata}
 
     def parse_content(self, content: Cell):
+        """
+        Parse content based on the prefix value.
+
+        Args:
+            content (Cell): The Cell object containing the content to parse.
+
+        Returns:
+            dict: Parsed content data.
+
+        Raises:
+            InvalidPrefixError: If the prefix value is invalid.
+        """
         cs = content.begin_parse()
         prefix_value = self.parse_prefix(cs)
-
-        print("prefix_value=", prefix_value)
 
         # Merge custom handlers with default handlers, with custom handlers taking precedence
         handlers = {**self.default_handlers, **self.prefix_handlers}
@@ -119,6 +215,16 @@ class TEP64Parser:
 
 # Example custom handler for a new prefix
 def custom_prefix_handler(cs, ipfs_endpoint):
+    """
+    Custom handler for a specific prefix.
+
+    Args:
+        cs (Cell): The Cell object containing the data to handle.
+        ipfs_endpoint (str): The IPFS endpoint URL.
+
+    Returns:
+        dict: Custom handler result data.
+    """
     # Custom logic for handling this prefix
     return {"type": "custom", "data": "custom handler logic"}
 
@@ -129,7 +235,7 @@ custom_handlers = {
     # Add more custom handlers as needed
 }
 
-# Create an instance of the parser
+# Create an instance of the parser with custom handlers
 parser = TEP64Parser(
     prefix_handlers=custom_handlers,
 )
